@@ -1,0 +1,91 @@
+#cloud-config
+${yamlencode({
+  write_files = [
+    {
+      path        = "/etc/sysctl.d/99-tailscale.conf"
+      permissions = "0644"
+      content     = "net.ipv4.ip_forward = 1\nnet.ipv6.conf.all.forwarding = 1\n"
+    },
+    {
+      path        = "/etc/unbound/unbound.conf.d/forwarder.conf"
+      permissions = "0644"
+      content     = unbound_config
+    },
+    {
+      path        = "/etc/nftables.conf"
+      permissions = "0644"
+      content     = nftables_config
+    },
+    {
+      path        = "/etc/ts-router/bootstrap.env"
+      permissions = "0600"
+      owner       = "root:root"
+      content     = bootstrap_env
+    },
+    {
+      path        = "/usr/local/sbin/ts-router-bootstrap.sh"
+      permissions = "0700"
+      owner       = "root:root"
+      content     = bootstrap_script
+    },
+    {
+      path        = "/usr/local/sbin/ts-router-firewall.sh"
+      permissions = "0700"
+      owner       = "root:root"
+      content     = firewall_script
+    },
+    {
+      path        = "/etc/systemd/system/ts-router-firewall.service"
+      permissions = "0644"
+      content = join("\n", [
+        "[Unit]",
+        "Description=Load the ts-router nftables firewall",
+        "DefaultDependencies=no",
+        "After=local-fs.target",
+        "Before=network-pre.target tailscaled.service",
+        "[Service]",
+        "Type=oneshot",
+        "ExecStart=/usr/local/sbin/ts-router-firewall.sh",
+        "RemainAfterExit=yes",
+        "[Install]",
+        "WantedBy=multi-user.target",
+        "",
+      ])
+    },
+    {
+      path        = "/etc/systemd/system/tailscaled.service.d/ts-router-firewall.conf"
+      permissions = "0644"
+      content = join("\n", [
+        "[Unit]",
+        "Requires=ts-router-firewall.service",
+        "After=ts-router-firewall.service",
+        "",
+      ])
+    },
+    {
+      path        = "/etc/systemd/system/ts-router-bootstrap.service"
+      permissions = "0644"
+      content = join("\n", [
+        "[Unit]",
+        "Description=Bootstrap Tailscale subnet router",
+        "Wants=network-online.target",
+        "After=network-online.target",
+        "[Service]",
+        "Type=oneshot",
+        "ExecStart=/usr/local/sbin/ts-router-bootstrap.sh",
+        "TimeoutStartSec=${timeout_seconds}",
+        "RuntimeDirectory=ts-router",
+        "RuntimeDirectoryMode=0700",
+        "Restart=no",
+        "[Install]",
+        "WantedBy=multi-user.target",
+        "",
+      ])
+    },
+  ]
+  runcmd = [
+    "systemctl daemon-reload",
+    "systemctl enable ts-router-firewall.service ts-router-bootstrap.service",
+    "systemctl start ts-router-bootstrap.service",
+  ]
+})}
