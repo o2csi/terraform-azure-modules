@@ -25,14 +25,15 @@ jobs:
       - name: Formatting
         run: tofu fmt -check -recursive
 
-      # Every direct subdirectory of modules/ and examples/, with no filter.
+      # Each subdirectory `modules/*/` and `examples/*/` names, which is every
+      # one whose name does not begin with a dot. Nothing filters them further:
       # OpenTofu is the only authority on what is a configuration and what is a
-      # test: it accepts .tf, .tofu, .tf.json and .tofu.json, and finds tests
-      # beside the configuration and under tests/. Any predicate here would
-      # restate those rules and drift from them, and a directory it wrongly
-      # rejected would be reported green. A directory holding no configuration
-      # costs three no-op invocations. Directories share one provider cache, so
-      # azurerm is fetched once per job.
+      # test, accepting .tf, .tofu, .tf.json and .tofu.json and finding tests
+      # beside the configuration and under tests/. A predicate here would
+      # restate those rules, drift from them, and report green on a directory it
+      # wrongly rejected. A directory holding no configuration costs three no-op
+      # invocations. Directories share one provider cache, so azurerm is fetched
+      # once per job.
       - name: Validate and test
         env:
           TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/tofu-plugin-cache
