@@ -83,8 +83,10 @@ resource "azurerm_network_security_rule" "this" {
   # one distinct source takes the singular argument. Routing on cardinality
   # rather than on spelling is what keeps a dotted tag such as
   # AzureFrontDoor.Backend or Storage.WestEurope working; the list was made
-  # distinct above so a repeated tag counts once. modules/ts-router writes both
-  # forms this way already, including `source_address_prefix = "Internet"`.
+  # distinct above so a repeated tag counts once. The cardinality routing is this
+  # module's own: modules/ts-router names each of its rules individually, so it
+  # writes `source_address_prefix = "Internet"` and its plural CIDR lists as
+  # fixed literals rather than choosing between them.
   source_address_prefix   = length(each.value.source_address_prefixes) == 1 ? one(each.value.source_address_prefixes) : null
   source_address_prefixes = length(each.value.source_address_prefixes) == 1 ? null : each.value.source_address_prefixes
   destination_port_range  = contains(each.value.destination_port_ranges, "*") ? "*" : null
