@@ -1,4 +1,9 @@
 locals {
+  # The provider models source prefixes as a set, so a repeated entry names no
+  # additional source. Each rule's list is made distinct here, which lets the
+  # cardinality routing in azurerm_network_security_rule count distinct sources
+  # and keeps a duplicate out of the plural argument. modules/ts-router
+  # normalises its own list the same way.
   nsg_rules = merge([
     for subnet_key, subnet in var.subnets : {
       for rule in concat(subnet.nsg_rules, [{
@@ -9,7 +14,10 @@ locals {
         protocol                = "*"
         source_address_prefixes = ["Internet"]
         destination_port_ranges = ["*"]
-      }]) : "${subnet_key}/${rule.name}" => merge(rule, { subnet_key = subnet_key })
+        }]) : "${subnet_key}/${rule.name}" => merge(rule, {
+        subnet_key              = subnet_key
+        source_address_prefixes = distinct(rule.source_address_prefixes)
+      })
     }
   ]...)
 }
@@ -61,13 +69,26 @@ resource "azurerm_network_security_rule" "this" {
   network_security_group_name = azurerm_network_security_group.this[each.value.subnet_key].name
   source_port_range           = "*"
   destination_address_prefix  = "*"
-  source_address_prefixes     = each.value.source_address_prefixes
 
-  # Azure answers 400 SecurityRuleParameterContainsInvalidPortRanges for a "*"
-  # inside destinationPortRanges: the wildcard is accepted only by the singular
-  # destinationPortRange. The two arguments are mutually exclusive, so a rule
-  # covering every port takes the singular form and every other rule takes the
-  # list. modules/ts-router already writes wildcards this way.
+  # Azure keeps its wildcards and service tags in the singular member of each
+  # argument pair and answers 400 when one reaches the plural member:
+  # SecurityRuleParameterContainsInvalidPortRanges for a "*" in
+  # destinationPortRanges, SecurityRuleParameterContainsUnsupportedValue for
+  # Internet, VirtualNetwork, AzureLoadBalancer, "*" or any other system tag in
+  # sourceAddressPrefixes. Each pair is mutually exclusive, so one member is
+  # always null.
+  #
+  # sourceAddressPrefix accepts a CIDR, an address, a wildcard or a service tag,
+  # while sourceAddressPrefixes accepts address prefixes only, so a rule naming
+  # one distinct source takes the singular argument. Routing on cardinality
+  # rather than on spelling is what keeps a dotted tag such as
+  # AzureFrontDoor.Backend or Storage.WestEurope working; the list was made
+  # distinct above so a repeated tag counts once. The cardinality routing is this
+  # module's own: modules/ts-router names each of its rules individually, so it
+  # writes `source_address_prefix = "Internet"` and its plural CIDR lists as
+  # fixed literals rather than choosing between them.
+  source_address_prefix   = length(each.value.source_address_prefixes) == 1 ? one(each.value.source_address_prefixes) : null
+  source_address_prefixes = length(each.value.source_address_prefixes) == 1 ? null : each.value.source_address_prefixes
   destination_port_range  = contains(each.value.destination_port_ranges, "*") ? "*" : null
   destination_port_ranges = contains(each.value.destination_port_ranges, "*") ? null : each.value.destination_port_ranges
 }
