@@ -51,6 +51,15 @@ variable "subnets" {
   validation {
     condition = alltrue([
       for subnet in values(var.subnets) : alltrue([
+        for rule in subnet.nsg_rules : !contains(rule.destination_port_ranges, "*") || length(rule.destination_port_ranges) == 1
+      ])
+    ])
+    error_message = "A destination_port_ranges list holding \"*\" must hold nothing else: \"*\" matches every destination port, so the other entries have no effect."
+  }
+
+  validation {
+    condition = alltrue([
+      for subnet in values(var.subnets) : alltrue([
         for rule in subnet.nsg_rules : rule.priority != 4000
       ])
     ])
