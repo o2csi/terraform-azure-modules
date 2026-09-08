@@ -25,11 +25,11 @@ jobs:
       - name: Formatting
         run: tofu fmt -check -recursive
 
-      # Each subdirectory `modules/*/` and `examples/*/` names, which is every
-      # one whose name does not begin with a dot. Nothing filters them further:
-      # OpenTofu is the only authority on what is a configuration and what is a
-      # test, accepting .tf, .tofu, .tf.json and .tofu.json and finding tests
-      # beside the configuration and under tests/. A predicate here would
+      # Every subdirectory of modules/ and examples/, including one whose name
+      # begins with a dot, which is what `dotglob` adds. Nothing filters them
+      # further: OpenTofu is the only authority on what is a configuration and
+      # what is a test, accepting .tf, .tofu, .tf.json and .tofu.json and finding
+      # tests beside the configuration and under tests/. A predicate here would
       # restate those rules, drift from them, and report green on a directory it
       # wrongly rejected. A directory holding no configuration costs three no-op
       # invocations. Directories share one provider cache, so azurerm is fetched
@@ -39,6 +39,7 @@ jobs:
           TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/tofu-plugin-cache
         run: |
           set -euo pipefail
+          shopt -s dotglob
           mkdir -p "$TF_PLUGIN_CACHE_DIR"
           status=0
           for dir in modules/*/ examples/*/; do

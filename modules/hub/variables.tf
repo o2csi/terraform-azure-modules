@@ -91,6 +91,38 @@ variable "subnets" {
     ])
     error_message = "Inbound Allow rules may source only RFC1918 or 100.64.0.0/10 CGNAT CIDRs; Internet, *, 0.0.0.0/0, and public prefixes are forbidden."
   }
+
+  # Azure has no form for two service tags in one rule: `sourceAddressPrefix`
+  # takes one tag, `sourceAddressPrefixes` takes address prefixes only. A rule
+  # naming several sources therefore renders the plural argument, and a tag among
+  # them is rejected at apply. Refuse it here instead, so the plan does not run.
+  # The message states the rule, not the offending value: a validation block
+  # emits one message for the whole condition.
+  #
+  # The test is whether each value parses as an address, because Azure's tag
+  # catalogue changes and varies by cloud, so no allowlist of tags can be
+  # correct. `cidrhost` accepts IPv4 and IPv6 CIDRs; the two suffixed attempts
+  # accept a bare address of either family, so the module keeps the full set
+  # Azure's plural argument accepts.
+  #
+  # `distinct` is case-sensitive, so `["VirtualNetwork", "virtualNetwork"]` reads
+  # as two sources and is refused. Azure treats those as one tag, but choosing a
+  # spelling to render on the caller's behalf is a decision the module should not
+  # make silently; the README states the requirement.
+  validation {
+    condition = alltrue([
+      for subnet in values(var.subnets) : alltrue([
+        for rule in subnet.nsg_rules :
+        length(distinct(rule.source_address_prefixes)) <= 1 || alltrue([
+          for prefix in distinct(rule.source_address_prefixes) :
+          can(cidrhost(prefix, 0)) ||
+          can(cidrhost("${prefix}/32", 0)) ||
+          can(cidrhost("${prefix}/128", 0))
+        ])
+      ])
+    ])
+    error_message = "A rule naming more than one distinct source may name only CIDR prefixes or bare IP addresses. Azure accepts a service tag or \"*\" only as a rule's single source, and two spellings of one tag count as two sources."
+  }
 }
 
 variable "tags" {

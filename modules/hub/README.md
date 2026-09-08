@@ -8,6 +8,13 @@ subnet, or allow inbound traffic from Internet, wildcard, public, or non-private
 prefixes. Inbound Allow sources are limited to RFC1918 or CGNAT (`100.64.0.0/10`)
 CIDRs.
 
+A rule naming more than one distinct source may name only CIDR prefixes or bare
+IP addresses, of either family. Azure accepts a service tag or `*` solely as a
+rule's single source, because its plural `sourceAddressPrefixes` argument takes
+address prefixes only. Repeating one tag is fine and counts once, but the
+spellings must match exactly: `["VirtualNetwork", "virtualNetwork"]` reads as two
+sources and is refused.
+
 `subnet_ids` is not released until every subnet NSG is associated and its rules,
 including the mandatory deny, are created. This prevents a consumer from racing
 the subnet's inbound-deny contract.

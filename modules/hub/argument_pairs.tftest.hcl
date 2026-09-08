@@ -187,3 +187,129 @@ run "a_wildcard_mixed_with_named_ports_is_refused_before_any_call" {
   # while the configuration reads as if they did.
   expect_failures = [var.subnets]
 }
+
+# Azure has no form for two tags in one rule. These three are refused at the
+# input rather than at apply, where the message names the rule but not the value.
+
+run "two_service_tags_in_one_rule_are_refused" {
+  command = plan
+
+  variables {
+    subnets = {
+      "snet-a" = {
+        address_prefix = "10.0.0.0/24"
+        nsg_rules = [{
+          name                    = "DenyTwoTags"
+          priority                = 210
+          direction               = "Inbound"
+          access                  = "Deny"
+          protocol                = "*"
+          source_address_prefixes = ["Internet", "VirtualNetwork"]
+          destination_port_ranges = ["443"]
+        }]
+      }
+    }
+  }
+
+  expect_failures = [var.subnets]
+}
+
+run "a_service_tag_beside_an_address_is_refused" {
+  command = plan
+
+  variables {
+    subnets = {
+      "snet-a" = {
+        address_prefix = "10.0.0.0/24"
+        nsg_rules = [{
+          name                    = "DenyTagAndCidr"
+          priority                = 220
+          direction               = "Inbound"
+          access                  = "Deny"
+          protocol                = "*"
+          source_address_prefixes = ["AzureFrontDoor.Backend", "10.1.0.0/16"]
+          destination_port_ranges = ["443"]
+        }]
+      }
+    }
+  }
+
+  expect_failures = [var.subnets]
+}
+
+run "a_wildcard_beside_an_address_is_refused" {
+  command = plan
+
+  variables {
+    subnets = {
+      "snet-a" = {
+        address_prefix = "10.0.0.0/24"
+        nsg_rules = [{
+          name                    = "DenyWildcardAndCidr"
+          priority                = 230
+          direction               = "Inbound"
+          access                  = "Deny"
+          protocol                = "*"
+          source_address_prefixes = ["*", "10.1.0.0/16"]
+          destination_port_ranges = ["443"]
+        }]
+      }
+    }
+  }
+
+  expect_failures = [var.subnets]
+}
+
+run "one_tag_spelled_two_ways_reads_as_two_sources_and_is_refused" {
+  command = plan
+
+  variables {
+    subnets = {
+      "snet-a" = {
+        address_prefix = "10.0.0.0/24"
+        nsg_rules = [{
+          name                    = "DenyCaseVariants"
+          priority                = 235
+          direction               = "Inbound"
+          access                  = "Deny"
+          protocol                = "*"
+          source_address_prefixes = ["VirtualNetwork", "virtualNetwork"]
+          destination_port_ranges = ["443"]
+        }]
+      }
+    }
+  }
+
+  # Azure treats these as one tag. `distinct` is case-sensitive, so the module
+  # sees two sources and refuses rather than choosing a spelling for the caller.
+  expect_failures = [var.subnets]
+}
+
+run "bare_addresses_beside_a_cidr_are_accepted" {
+  command = plan
+
+  variables {
+    subnets = {
+      "snet-a" = {
+        address_prefix = "10.0.0.0/24"
+        nsg_rules = [{
+          name                    = "DenyMixedAddresses"
+          priority                = 240
+          direction               = "Inbound"
+          access                  = "Deny"
+          protocol                = "*"
+          source_address_prefixes = ["10.1.0.0/16", "10.2.0.1", "2001:db8::1"]
+          destination_port_ranges = ["443"]
+        }]
+      }
+    }
+  }
+
+  # The refusal above tests whether a value is an address, not whether it carries
+  # a slash, so Azure's full plural set survives: CIDRs of either family and bare
+  # addresses of either family.
+  assert {
+    condition     = azurerm_network_security_rule.this["snet-a/DenyMixedAddresses"].source_address_prefixes == toset(["10.1.0.0/16", "10.2.0.1", "2001:db8::1"])
+    error_message = "several distinct addresses, CIDR or bare, belong in source_address_prefixes"
+  }
+}
