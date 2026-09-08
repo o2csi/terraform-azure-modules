@@ -62,7 +62,14 @@ resource "azurerm_network_security_rule" "this" {
   source_port_range           = "*"
   destination_address_prefix  = "*"
   source_address_prefixes     = each.value.source_address_prefixes
-  destination_port_ranges     = each.value.destination_port_ranges
+
+  # Azure answers 400 SecurityRuleParameterContainsInvalidPortRanges for a "*"
+  # inside destinationPortRanges: the wildcard is accepted only by the singular
+  # destinationPortRange. The two arguments are mutually exclusive, so a rule
+  # covering every port takes the singular form and every other rule takes the
+  # list. modules/ts-router already writes wildcards this way.
+  destination_port_range  = contains(each.value.destination_port_ranges, "*") ? "*" : null
+  destination_port_ranges = contains(each.value.destination_port_ranges, "*") ? null : each.value.destination_port_ranges
 }
 
 resource "azurerm_subnet_network_security_group_association" "this" {
