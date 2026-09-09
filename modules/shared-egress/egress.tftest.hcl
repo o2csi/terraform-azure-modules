@@ -41,6 +41,7 @@ run "subscription_wide_source_refused" {
 run "one_router_rollout" {
   command = apply
   variables {
+    retry_tokens                       = { "001" = "0123456789abcdef0123456789abcdef" }
     subnet_network_security_group_name = "hub-app-nsg"
     enabled                            = true
     allowed_source_cidrs               = ["10.16.9.0/26"]
@@ -78,6 +79,10 @@ run "one_router_rollout" {
   assert {
     condition     = azurerm_network_security_rule.subnet_probe[0].source_address_prefix == "AzureLoadBalancer" && azurerm_network_security_rule.subnet_probe[0].destination_address_prefixes == toset(["10.16.0.4"]) && azurerm_network_security_rule.subnet_probe[0].destination_port_range == "8081" && azurerm_network_security_rule.subnet_probe[0].priority == 120
     error_message = "Probe must pass the subnet NSG before its explicit Internet deny, restricted to the active router and HTTP readiness port."
+  }
+  assert {
+    condition     = strcontains(base64decode(jsondecode(azurerm_virtual_machine_extension.egress["001"].settings).script), "# o2csi-egress retry 0123456789abcdef0123456789abcdef") && !strcontains(base64decode(jsondecode(azurerm_virtual_machine_extension.egress["002"].settings).script), "# o2csi-egress retry")
+    error_message = "Explicit recovery must rerun only the requested extension."
   }
   assert {
     condition     = local.configuration["002"].enabled == false && local.configuration["001"].sources == tolist(["10.16.9.0/26"])
@@ -143,4 +148,10 @@ run "shared_router_nsg_refused" {
     }
   }
   expect_failures = [var.routers]
+}
+
+run "unknown_retry_router_refused" {
+  command = plan
+  variables { retry_tokens = { "003" = "0123456789abcdef0123456789abcdef" } }
+  expect_failures = [var.retry_tokens]
 }

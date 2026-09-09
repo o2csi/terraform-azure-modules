@@ -11,15 +11,16 @@ locals {
   # The script and configuration contain no credentials. The existing VM's
   # custom_data remains byte-identical, avoiding a destructive VM replacement.
   installer = {
-    for key, router in var.routers : key => join("\n", [
-      "#!/bin/sh",
-      "set -eu",
-      "python3 - '${base64encode(jsonencode(local.configuration[key]))}' <<'PY'",
-      "import base64,sys",
-      "source = base64.b64decode('${filebase64("${path.module}/files/egress.py")}')",
-      "exec(compile(source, '<egress-installer>', 'exec'), {'__name__': '__main__', 'INSTALLER_SOURCE': source})",
-      "PY",
-    ])
+    for key, router in var.routers : key => join("\n", concat(
+      ["#!/bin/sh", "set -eu"],
+      contains(keys(var.retry_tokens), key) ? ["# o2csi-egress retry ${var.retry_tokens[key]}"] : [],
+      [
+        "python3 - '${base64encode(jsonencode(local.configuration[key]))}' <<'PY'",
+        "import base64,sys",
+        "source = base64.b64decode('${filebase64("${path.module}/files/egress.py")}')",
+        "exec(compile(source, '<egress-installer>', 'exec'), {'__name__': '__main__', 'INSTALLER_SOURCE': source})",
+        "PY",
+    ]))
   }
 }
 
