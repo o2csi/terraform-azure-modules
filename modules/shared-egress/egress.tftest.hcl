@@ -76,6 +76,10 @@ run "one_router_rollout" {
     error_message = "Both NSG layers must admit only the granted source towards Internet; the inactive router receives no new permission."
   }
   assert {
+    condition     = azurerm_network_security_rule.subnet_probe[0].source_address_prefix == "AzureLoadBalancer" && azurerm_network_security_rule.subnet_probe[0].destination_address_prefixes == toset(["10.16.0.4"]) && azurerm_network_security_rule.subnet_probe[0].destination_port_range == "8081" && azurerm_network_security_rule.subnet_probe[0].priority == 120
+    error_message = "Probe must pass the subnet NSG before its explicit Internet deny, restricted to the active router and HTTP readiness port."
+  }
+  assert {
     condition     = local.configuration["002"].enabled == false && local.configuration["001"].sources == tolist(["10.16.9.0/26"])
     error_message = "Do not activate an unselected router or broaden the source grant."
   }
@@ -85,7 +89,7 @@ run "disabled_removes_transit_grants" {
   command = plan
   variables { subnet_network_security_group_name = "hub-app-nsg" }
   assert {
-    condition     = length(azurerm_network_security_rule.transit) == 0 && length(azurerm_network_security_rule.subnet_transit) == 0
+    condition     = length(azurerm_network_security_rule.transit) == 0 && length(azurerm_network_security_rule.subnet_transit) == 0 && length(azurerm_network_security_rule.subnet_probe) == 0
     error_message = "Disabled egress must not retain new transit permissions."
   }
 }

@@ -143,3 +143,20 @@ resource "azurerm_network_security_rule" "subnet_transit" {
   source_address_prefixes     = var.allowed_source_cidrs
   destination_address_prefix  = "Internet"
 }
+
+# The hub's explicit Internet deny can precede Azure's default probe allowance.
+# Authorize the same exact probe flow at both NSG layers.
+resource "azurerm_network_security_rule" "subnet_probe" {
+  count                        = var.enabled && var.subnet_network_security_group_name != null ? 1 : 0
+  name                         = "AllowEgressProbe"
+  resource_group_name          = var.resource_group_name
+  network_security_group_name  = var.subnet_network_security_group_name
+  priority                     = 120
+  direction                    = "Inbound"
+  access                       = "Allow"
+  protocol                     = "Tcp"
+  source_port_range            = "*"
+  destination_port_range       = "8081"
+  source_address_prefix        = "AzureLoadBalancer"
+  destination_address_prefixes = [for router in values(local.active_routers) : router.private_ip]
+}
