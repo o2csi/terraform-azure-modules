@@ -62,3 +62,11 @@ routed packets from ordinary VIP-addressed application rules alone. This module
 selects floating HA ports explicitly; actual spoke evidence remains required.
 See [HA ports](https://learn.microsoft.com/en-us/azure/load-balancer/load-balancer-ha-ports-overview)
 and [the NVA routing lab, Internet egress](https://github.com/erjosito/azure-networking-lab#lab6).
+
+A failed CustomScript extension can remain `Failed` after local health recovers.
+A refresh can then produce no extension diff. Preserve the failed apply and
+inventory Azure/state first. Set a new `retry_tokens[router]` value to
+explicitly change the script payload with an inert validated comment and rerun
+that one extension (AzureRM4.81 does not expose the API force-update tag), review and apply its saved plan, then verify
+provisioning success and real probe health. Persist the token for later plans;
+do not regenerate it automatically, delete the extension or edit state to retry.

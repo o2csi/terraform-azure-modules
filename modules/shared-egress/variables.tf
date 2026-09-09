@@ -50,3 +50,17 @@ variable "subnet_network_security_group_name" {
     error_message = "The subnet NSG must be distinct from all router NIC NSGs; shared-NSG topologies are not supported by this module."
   }
 }
+
+variable "retry_tokens" {
+  description = "Explicit per-router retry tokens after diagnosing a failed extension; retain tokens across later plans. No automatic retry."
+  type        = map(string)
+  default     = {}
+  validation {
+    condition     = alltrue([for token in values(var.retry_tokens) : can(regex("^[a-f0-9]{32}$", token))])
+    error_message = "Retry tokens must be 32 lowercase hexadecimal characters."
+  }
+  validation {
+    condition     = alltrue([for slot in keys(var.retry_tokens) : contains(keys(var.routers), slot)])
+    error_message = "Retry tokens may refer only to declared routers."
+  }
+}
