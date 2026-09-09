@@ -8,7 +8,10 @@ application subnet and route `0.0.0.0/0 -> endpoint.private_ip`.
 `enabled` defaults to false. Supply explicit application subnets in
 `allowed_source_cidrs` and router IDs/NIC configuration/NSG names in `routers`.
 Set `active` for one router at a time and validate it before activating the next.
-The internal Standard LB uses HA ports and an HTTP readiness probe restricted
+Supply `subnet_network_security_group_name` when the hub subnet has an NSG.
+Both NSG layers receive an inbound rule at priority 130 for the granted source
+subnets towards `Internet` only; default VNet rules do not admit that path.
+The internal Standard LB uses floating HA ports and an HTTP readiness probe restricted
 to Azure probes. Router SNAT preserves the return path through the selected VM;
 existing connections can be lost on failover. Neither Tailscale HA nor a healthy
 HTTP listener alone proves forwarding from a spoke: perform actual spoke tests.
@@ -45,3 +48,12 @@ sudo unshare --mount --net --propagation private python3 tests/test_egress.py --
 
 The last test exercises real forwarding/SNAT and denial/rollback in isolated
 network namespaces; it does not alter the host network.
+
+The routed packet must reach the guest with its original Internet destination,
+then traverse `forward` and SNAT. The frontend is a UDR next hop, not a service
+address to bind on a guest loopback. The probe targets each NIC's private IP.
+Azure also supports nonfloating HA-ports designs; do not infer the behavior of
+routed packets from ordinary VIP-addressed application rules alone. This module
+selects floating HA ports explicitly; actual spoke evidence remains required.
+See [HA ports](https://learn.microsoft.com/en-us/azure/load-balancer/load-balancer-ha-ports-overview)
+and [the NVA routing lab, Internet egress](https://github.com/erjosito/azure-networking-lab#lab6).

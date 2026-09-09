@@ -36,3 +36,9 @@ variable "routers" {
   }))
   default = {}
 }
+
+variable "subnet_network_security_group_name" {
+  description = "Existing hub subnet NSG, if attached: transit must pass both subnet and router NIC NSGs."
+  type        = string
+  default     = null
+}
