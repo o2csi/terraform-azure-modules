@@ -8,6 +8,7 @@ OpenTofu `>= 1.11` and `hashicorp/azurerm ~> 4.0`.
 
 | Module | Purpose |
 |---|---|
+| [landing-zone](./modules/landing-zone) | Platform VNet shell and both hub/spoke peerings; project owns subnets and workloads |
 | [hub](./modules/hub) | Resource group, hub VNet, subnets, and per-subnet NSGs with mandatory internet-inbound deny rule and no public inbound Allows |
 | [private-dns](./modules/private-dns) | Private DNS zones and VNet links with plan-time key-based single-registration protection |
 | [private-endpoint](./modules/private-endpoint) | Private Endpoint with optional private DNS zone group and automatic or manual connection request |
