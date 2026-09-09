@@ -54,6 +54,21 @@ run "one_resolver_is_refused" {
   expect_failures = [var.dns_servers]
 }
 
+run "maximum_length_vnet_names_produce_valid_peering_names" {
+  command = apply
+  variables {
+    vnet_name     = join("", [for i in range(64) : "s"])
+    hub_vnet_name = join("", [for i in range(64) : "h"])
+  }
+  assert {
+    condition = alltrue([
+      for name in [azurerm_virtual_network_peering.hub_to_spoke.name, azurerm_virtual_network_peering.spoke_to_hub.name] :
+      length(name) <= 80 && can(regex("^[A-Za-z0-9][A-Za-z0-9_.-]*[A-Za-z0-9_]$", name))
+    ])
+    error_message = "Valid maximum-length VNet names must never produce an invalid Azure peering name."
+  }
+}
+
 run "invalid_environment_prefix_is_refused" {
   command = plan
   variables {

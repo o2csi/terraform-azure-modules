@@ -25,7 +25,7 @@ resource "azurerm_virtual_network" "spoke" {
 }
 
 resource "azurerm_virtual_network_peering" "hub_to_spoke" {
-  name                         = "${var.hub_vnet_name}-to-${var.vnet_name}"
+  name                         = "to-${substr(var.vnet_name, 0, 40)}-${substr(sha256(lower(azurerm_virtual_network.spoke.id)), 0, 16)}"
   resource_group_name          = var.hub_resource_group_name
   virtual_network_name         = data.azurerm_virtual_network.hub.name
   remote_virtual_network_id    = azurerm_virtual_network.spoke.id
@@ -36,7 +36,7 @@ resource "azurerm_virtual_network_peering" "hub_to_spoke" {
 }
 
 resource "azurerm_virtual_network_peering" "spoke_to_hub" {
-  name                         = "${var.vnet_name}-to-${var.hub_vnet_name}"
+  name                         = "to-${substr(var.hub_vnet_name, 0, 40)}-${substr(sha256(lower(data.azurerm_virtual_network.hub.id)), 0, 16)}"
   resource_group_name          = azurerm_resource_group.platform.name
   virtual_network_name         = azurerm_virtual_network.spoke.name
   remote_virtual_network_id    = data.azurerm_virtual_network.hub.id

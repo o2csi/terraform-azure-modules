@@ -16,6 +16,11 @@ peerings permit forwarded traffic for subnet-router access; neither enables
 Azure VPN gateway transit. Peering alone does not supply Internet egress or
 authorize inbound traffic through project NSGs.
 
+Peering names contain a capped readable target name and a suffix derived from
+the target VNet's case-normalized resource ID. They stay below Azure's 80-character
+limit even for 64-character VNet names, and distinguish identical VNet names in
+different resource groups. They are resolved when the target VNet ID is available.
+
 The VNet and peerings belong in the platform state. A project looks up its VNet
 through explicit identifiers or Azure data sources, without reading platform
 state. Creating or deleting project subnets requires a role scoped to this VNet;
