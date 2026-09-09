@@ -25,6 +25,13 @@ jobs:
       - name: Formatting
         run: tofu fmt -check -recursive
 
+      - name: Router egress unit and packet tests
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y nftables iproute2
+          python3 modules/shared-egress/tests/test_egress.py
+          sudo unshare --mount --net --propagation private python3 modules/shared-egress/tests/test_egress.py --network
+
       # Every subdirectory of modules/ and examples/, including one whose name
       # begins with a dot, which is what `dotglob` adds. Nothing filters them
       # further: OpenTofu is the only authority on what is a configuration and
