@@ -80,8 +80,9 @@ resource "azurerm_lb_rule" "egress" {
   protocol                       = "All"
   frontend_port                  = 0
   backend_port                   = 0
-  floating_ip_enabled            = false
-  disable_outbound_snat          = true
+  # Preserve destination addressing for the transparent NVA forwarding path.
+  floating_ip_enabled   = true
+  disable_outbound_snat = true
 }
 
 resource "azurerm_network_security_rule" "probe" {
@@ -109,4 +110,36 @@ resource "azurerm_virtual_machine_extension" "egress" {
   auto_upgrade_minor_version = true
   settings                   = jsonencode({ script = base64encode(local.installer[each.key]) })
   tags                       = var.tags
+}
+
+# Forwarded packets still carry the public destination at inbound NSG evaluation;
+# default AllowVnetInBound only admits VirtualNetwork destinations.
+resource "azurerm_network_security_rule" "transit" {
+  for_each                    = local.active_routers
+  name                        = "AllowSharedInternetTransit"
+  resource_group_name         = var.resource_group_name
+  network_security_group_name = each.value.network_security_group_name
+  priority                    = 130
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "*"
+  source_port_range           = "*"
+  destination_port_range      = "*"
+  source_address_prefixes     = var.allowed_source_cidrs
+  destination_address_prefix  = "Internet"
+}
+
+resource "azurerm_network_security_rule" "subnet_transit" {
+  count                       = var.enabled && var.subnet_network_security_group_name != null ? 1 : 0
+  name                        = "AllowSharedInternetTransit"
+  resource_group_name         = var.resource_group_name
+  network_security_group_name = var.subnet_network_security_group_name
+  priority                    = 130
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "*"
+  source_port_range           = "*"
+  destination_port_range      = "*"
+  source_address_prefixes     = var.allowed_source_cidrs
+  destination_address_prefix  = "Internet"
 }

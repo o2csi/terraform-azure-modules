@@ -35,4 +35,18 @@ variable "routers" {
     active                      = bool
   }))
   default = {}
+  validation {
+    condition     = length(distinct([for router in values(var.routers) : lower(router.network_security_group_name)])) == length(var.routers)
+    error_message = "Each router must use a distinct NIC NSG; sharing creates duplicate probe/transit rule ownership."
+  }
+}
+
+variable "subnet_network_security_group_name" {
+  description = "Existing hub subnet NSG, if attached: transit must pass both subnet and router NIC NSGs."
+  type        = string
+  default     = null
+  validation {
+    condition     = var.subnet_network_security_group_name == null ? true : !contains([for router in values(var.routers) : lower(router.network_security_group_name)], lower(var.subnet_network_security_group_name))
+    error_message = "The subnet NSG must be distinct from all router NIC NSGs; shared-NSG topologies are not supported by this module."
+  }
 }
