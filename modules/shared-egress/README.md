@@ -25,7 +25,7 @@ The extension preserves immutable cloud-init. It validates and atomically
 replaces the module-owned nftables file, retaining the original in
 `/var/lib/o2csi-egress/baseline.nft`. The existing firewall boot service reloads
 the augmented rules. Health validates IPv4 forwarding, the loaded rules digest
-and direct HTTPS egress. Only the explicitly granted source subnets can obtain
+and direct certificate-verified TLS egress. Only the explicitly granted source subnets can obtain
 new Azure-interface-to-Azure-interface Internet forwarding. Private destinations
 are denied on that path; existing Tailscale and DNS rules are retained.
 
@@ -70,3 +70,10 @@ explicitly change the script payload with an inert validated comment and rerun
 that one extension (AzureRM4.81 does not expose the API force-update tag), review and apply its saved plan, then verify
 provisioning success and real probe health. Persist the token for later plans;
 do not regenerate it automatically, delete the extension or edit state to retry.
+
+Readiness connects directly to public resolver TLS endpoints at1.1.1.1:443
+(`cloudflare-dns.com`) and8.8.8.8:443 (`dns.google`), without sending DNS queries.
+At least one verified handshake is required. This avoids false negatives from
+homepage anti-bot403 responses/redirects; no HTTP status or DNS lookup is needed.
+It proves router-originated TLS reachability, not arbitrary application traffic
+or spoke forwarding. DNS/registry/capacity checks remain separate rollout gates.
