@@ -57,11 +57,30 @@ class Unit(unittest.TestCase):
             self.assertFalse(egress.healthy(CONFIG))
 
     def test_health_refuses_no_external_tls(self):
-        opener = MagicMock()
-        opener.open.side_effect = OSError('unreachable')
         with patch.object(Path, 'read_text', side_effect=['1', 'expected']), \
              patch.object(egress, 'rules_digest', return_value='expected'), \
-             patch.object(egress.urllib.request, 'build_opener', return_value=opener):
+             patch.object(egress.socket, 'create_connection', side_effect=OSError('unreachable')):
+            self.assertFalse(egress.healthy(CONFIG))
+
+    def test_tls_fallback_verifies_hostname_without_http_or_proxy(self):
+        context = MagicMock()
+        context.wrap_socket.side_effect = [egress.ssl.SSLCertVerificationError('invalid certificate'), MagicMock()]
+        with patch.object(Path, 'read_text', side_effect=['1', 'expected']), \
+             patch.object(egress, 'rules_digest', return_value='expected'), \
+             patch.object(egress.ssl, 'create_default_context', return_value=context), \
+             patch.object(egress.socket, 'create_connection', return_value=MagicMock()) as connect:
+            self.assertTrue(egress.healthy(CONFIG))
+        self.assertEqual(connect.call_args_list[0].args[0], ('1.1.1.1',443))
+        self.assertEqual(connect.call_args_list[1].args[0], ('8.8.8.8',443))
+        self.assertEqual(context.wrap_socket.call_args.kwargs['server_hostname'],'dns.google')
+
+    def test_no_valid_tls_certificate_is_unhealthy(self):
+        context = MagicMock()
+        context.wrap_socket.side_effect = egress.ssl.SSLCertVerificationError('invalid certificate')
+        with patch.object(Path, 'read_text', side_effect=['1', 'expected']), \
+             patch.object(egress, 'rules_digest', return_value='expected'), \
+             patch.object(egress.ssl, 'create_default_context', return_value=context), \
+             patch.object(egress.socket, 'create_connection', return_value=MagicMock()):
             self.assertFalse(egress.healthy(CONFIG))
 
     def test_listener_bind_failure_cannot_notify_readiness(self):

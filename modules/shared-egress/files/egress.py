@@ -10,12 +10,12 @@ import os
 from pathlib import Path
 import re
 import socket
+import ssl
 import subprocess
 import sys
 import tempfile
 import threading
 import time
-import urllib.request
 
 ROOT = Path('/var/lib/o2csi-egress')
 FIREWALL = Path('/etc/nftables.conf')
@@ -112,14 +112,16 @@ def healthy(config):
         return False
     if rules_digest() != (ROOT / 'rules.sha256').read_text().strip():
         return False
-    # Bypass ambient proxies; each router must have working direct TLS egress.
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-    for url in ('https://www.microsoft.com/', 'https://www.cloudflare.com/'):
+    # Test direct Internet TLS, not the HTTP policy/redirects of a homepage.
+    # Fixed public addresses avoid DNS/proxy/captive HTTP success; certificate
+    # and hostname verification remain enabled for two independent operators.
+    context = ssl.create_default_context()
+    for address, hostname in (('1.1.1.1', 'cloudflare-dns.com'), ('8.8.8.8', 'dns.google')):
         try:
-            with opener.open(url, timeout=3) as response:
-                if response.status < 400:
+            with socket.create_connection((address, 443), timeout=3) as raw:
+                with context.wrap_socket(raw, server_hostname=hostname):
                     return True
-        except (OSError, ValueError):
+        except OSError:
             pass
     return False
 
