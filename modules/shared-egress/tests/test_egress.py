@@ -64,6 +64,30 @@ class Unit(unittest.TestCase):
              patch.object(egress.urllib.request, 'build_opener', return_value=opener):
             self.assertFalse(egress.healthy(CONFIG))
 
+    def test_listener_bind_failure_cannot_notify_readiness(self):
+        with patch.object(Path, 'read_text', return_value=json.dumps(CONFIG)), \
+             patch.object(egress.http.server, 'ThreadingHTTPServer', side_effect=OSError('address in use')), \
+             patch.object(egress.socket, 'socket') as notify:
+            with self.assertRaises(OSError):
+                egress.serve()
+            notify.assert_not_called()
+
+    def test_rollback_does_not_require_a_route(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory); firewall=root/'firewall.nft'
+            current=egress.render(BASE,CONFIG,'eth0')
+            firewall.write_text(current)
+            (root/'baseline.nft').write_text(BASE)
+            (root/'installed.nft').write_text(current)
+            def command(*args, **kwargs):
+                if args[0]=='ip':
+                    raise subprocess.CalledProcessError(2,args)
+                return subprocess.CompletedProcess(args,0,stdout='')
+            with patch.object(egress,'ROOT',root), patch.object(egress,'FIREWALL',firewall), \
+                 patch.object(egress,'run',side_effect=command), patch.object(egress.subprocess,'run'):
+                egress.install(dict(CONFIG,enabled=False),b'')
+            self.assertEqual(firewall.read_text(),BASE)
+
 
 def network_test():
     # Invoke under `sudo unshare --mount --net --propagation private`.

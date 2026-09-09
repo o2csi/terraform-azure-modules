@@ -27,7 +27,7 @@ jobs:
 
       - name: Router egress unit and packet tests
         run: |
-          sudo apt-get update -qq
+          sudo apt-get update -qq -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=-
           sudo apt-get install -y nftables iproute2
           python3 modules/shared-egress/tests/test_egress.py
           sudo unshare --mount --net --propagation private python3 modules/shared-egress/tests/test_egress.py --network

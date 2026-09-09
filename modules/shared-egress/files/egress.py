@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import re
+import socket
 import subprocess
 import sys
 import tempfile
@@ -143,8 +144,16 @@ def serve():
             self.wfile.write(b'ok\n' if ok else b'unavailable\n')
         def log_message(self, *args):
             pass
+    # Type=notify must not declare readiness until this process owns the port.
+    server = http.server.ThreadingHTTPServer((config['private_ip'], config['health_port']), Handler)
     threading.Thread(target=refresh, daemon=True).start()
-    http.server.ThreadingHTTPServer((config['private_ip'], config['health_port']), Handler).serve_forever()
+    address = os.environ['NOTIFY_SOCKET']
+    if address.startswith('@'):
+        address = '\0' + address[1:]
+    with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as notify:
+        notify.connect(address)
+        notify.sendall(b'READY=1')
+    server.serve_forever()
 
 
 def install(config, source):
@@ -161,8 +170,12 @@ def install(config, source):
         if not config['enabled'] and not baseline_path.exists():
             print('Egress remains disabled; router unchanged.')
             return
-        route = json.loads(run('ip', '-j', 'route', 'get', '1.1.1.1').stdout)[0]
-        content = render(baseline, config, route['dev']) if config['enabled'] else baseline
+        if config['enabled']:
+            route = json.loads(run('ip', '-j', 'route', 'get', '1.1.1.1').stdout)[0]
+            content = render(baseline, config, route['dev'])
+        else:
+            # Recovery must work even when the router has lost Internet routing.
+            content = baseline
         atomic(ROOT / 'candidate.nft', content)
         run('nft', '-c', '-f', str(ROOT / 'candidate.nft'))
         if not baseline_path.exists():
@@ -189,7 +202,8 @@ def install(config, source):
             '[Unit]', 'Description=Shared egress readiness',
             'Requires=ts-router-firewall.service',
             'After=network-online.target ts-router-firewall.service',
-            'Wants=network-online.target', '[Service]',
+            'Wants=network-online.target', '[Service]', 'Type=notify',
+            'NotifyAccess=main', 'TimeoutStartSec=25',
             f'ExecStart=/usr/bin/python3 {RUNTIME} serve',
             'Restart=on-failure', 'RestartSec=5', 'NoNewPrivileges=yes',
             'ProtectSystem=strict', 'ProtectHome=yes', 'PrivateTmp=yes',
@@ -199,6 +213,7 @@ def install(config, source):
         run('systemctl', 'enable', '--now', 'o2csi-egress-health.service')
         if not healthy(config):
             raise RuntimeError('egress installed but not ready; evidence retained, probe stays unhealthy')
+        run('systemctl', 'is-active', '--quiet', 'o2csi-egress-health.service')
         print('Egress installed; firewall and direct TLS egress verified.')
 
 
