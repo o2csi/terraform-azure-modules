@@ -89,3 +89,54 @@ run "disabled_removes_transit_grants" {
     error_message = "Disabled egress must not retain new transit permissions."
   }
 }
+
+run "shared_subnet_nic_nsg_refused" {
+  command = plan
+  variables {
+    subnet_network_security_group_name = "ROUTER-001-NSG"
+    routers = {
+      "001" = {
+        vm_id                       = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-hub/providers/Microsoft.Compute/virtualMachines/router-001"
+        nic_id                      = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-hub/providers/Microsoft.Network/networkInterfaces/router-001"
+        nic_ip_configuration        = "primary"
+        network_security_group_name = "router-001-nsg"
+        private_ip                  = "10.16.0.4"
+        active                      = true
+      }
+      "002" = {
+        vm_id                       = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-hub/providers/Microsoft.Compute/virtualMachines/router-002"
+        nic_id                      = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-hub/providers/Microsoft.Network/networkInterfaces/router-002"
+        nic_ip_configuration        = "primary"
+        network_security_group_name = "router-002-nsg"
+        private_ip                  = "10.16.0.5"
+        active                      = false
+      }
+    }
+  }
+  expect_failures = [var.subnet_network_security_group_name]
+}
+
+run "shared_router_nsg_refused" {
+  command = plan
+  variables {
+    routers = {
+      "001" = {
+        vm_id                       = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-hub/providers/Microsoft.Compute/virtualMachines/router-001"
+        nic_id                      = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-hub/providers/Microsoft.Network/networkInterfaces/router-001"
+        nic_ip_configuration        = "primary"
+        network_security_group_name = "router-001-nsg"
+        private_ip                  = "10.16.0.4"
+        active                      = true
+      }
+      "002" = {
+        vm_id                       = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-hub/providers/Microsoft.Compute/virtualMachines/router-002"
+        nic_id                      = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-hub/providers/Microsoft.Network/networkInterfaces/router-002"
+        nic_ip_configuration        = "primary"
+        network_security_group_name = "ROUTER-001-NSG"
+        private_ip                  = "10.16.0.5"
+        active                      = false
+      }
+    }
+  }
+  expect_failures = [var.routers]
+}

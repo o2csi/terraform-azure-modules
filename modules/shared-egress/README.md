@@ -9,7 +9,10 @@ application subnet and route `0.0.0.0/0 -> endpoint.private_ip`.
 `allowed_source_cidrs` and router IDs/NIC configuration/NSG names in `routers`.
 Set `active` for one router at a time and validate it before activating the next.
 Supply `subnet_network_security_group_name` when the hub subnet has an NSG.
-Both NSG layers receive an inbound rule at priority 130 for the granted source
+This module requires distinct NSGs for each router NIC and for the hub subnet;
+shared NSGs are rejected during input validation (case-insensitive Azure names),
+before any duplicate rule could be created. This is a module constraint, not an
+Azure restriction. Both NSG layers receive an inbound rule at priority 130 for the granted source
 subnets towards `Internet` only; default VNet rules do not admit that path.
 The internal Standard LB uses floating HA ports and an HTTP readiness probe restricted
 to Azure probes. Router SNAT preserves the return path through the selected VM;
