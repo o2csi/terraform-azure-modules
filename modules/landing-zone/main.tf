@@ -1,4 +1,5 @@
 data "azurerm_virtual_network" "hub" {
+  provider            = azurerm.hub
   name                = var.hub_vnet_name
   resource_group_name = var.hub_resource_group_name
 }
@@ -25,6 +26,7 @@ resource "azurerm_virtual_network" "spoke" {
 }
 
 resource "azurerm_virtual_network_peering" "hub_to_spoke" {
+  provider                     = azurerm.hub
   name                         = "to-${substr(var.vnet_name, 0, 40)}-${substr(sha256(lower(azurerm_virtual_network.spoke.id)), 0, 16)}"
   resource_group_name          = var.hub_resource_group_name
   virtual_network_name         = data.azurerm_virtual_network.hub.name

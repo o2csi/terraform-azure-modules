@@ -5,6 +5,12 @@ peerings. The existing hub is read through an Azure data source. The caller's
 platform identity needs authority over the spoke RG and the hub peering; this
 module creates no role or role assignment.
 
+Pass two provider configurations: `azurerm` for the spoke subscription and
+`azurerm.hub` for the hub subscription. In `main.tf`, the hub VNet read
+(`data.azurerm_virtual_network.hub`) and hub-to-spoke peering
+(`azurerm_virtual_network_peering.hub_to_spoke`) use `azurerm.hub`. Pass the same
+configuration twice when both are in one subscription.
+
 The project repository owns its separate RG, standalone subnets, NSGs, route
 tables, egress and VMs. This module declares no inline or standalone subnet and
 ignores subsequent changes to the VNet's subnet collection. It also creates no
